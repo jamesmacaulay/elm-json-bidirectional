@@ -62,7 +62,7 @@ This package is at its best when you have full control over the shape of the JSO
 
 ## What about fuzz tests?
 
-Fuzz tests are a great way to make sure your encoders and decoders are mirror images of each other. Here's a great article on the topic, and the inspiration for releasing this package:
+Fuzz tests are a great way to make sure your encoders and decoders are mirror images of each other. Here's a great article on this topic that was also the inspiration for releasing this package:
 
 https://www.brianthicks.com/post/2017/04/24/add-safety-to-your-elm-json-encoders-with-fuzz-testing/
 
