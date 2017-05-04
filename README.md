@@ -46,15 +46,9 @@ userCoder =
     Json.object User
         |> Json.withField "name" .name Json.string
         |> Json.withField "isAdmin" .isAdmin Json.bool
-
-userDecoder : Decoder User
-userDecoder =
-    Json.decoder userCoder
-
-encodeUser : User -> Encode.Value
-encodeUser user =
-    Json.encodeValue userCoder user
 ```
+
+Encoding and decoding is accomplished with the `encodeValue`, `encodeString`, `decodeValue`, and `decodeString` functions. If you want to get a Decoder from a Coder, you can use the `decoder` function.
 
 ## What's the catch?
 
