@@ -110,6 +110,35 @@ dictFuzzer valueFuzzer =
         |> Fuzz.map Dict.fromList
 
 
+resultCoder : Json.Coder err -> Json.Coder ok -> Json.Coder (Result err ok)
+resultCoder errCoder okCoder =
+    let
+        wrappedErr =
+            Json.at [ "err" ] errCoder
+
+        wrappedOk =
+            Json.at [ "ok" ] okCoder
+    in
+        Json.custom
+            (\result ->
+                case result of
+                    Err x ->
+                        Json.encodeValue wrappedErr x
+
+                    Ok x ->
+                        Json.encodeValue wrappedOk x
+            )
+            (Decode.oneOf
+                [ Decode.map Err (Json.decoder wrappedErr)
+                , Decode.map Ok (Json.decoder wrappedOk)
+                ]
+            )
+
+
+type Constant a
+    = Constant a
+
+
 all : Test
 all =
     Test.describe "Json.Bidirectional"
@@ -175,5 +204,11 @@ all =
             , testCoderRoundTrip "value"
                 (Fuzz.map Encode.string Fuzz.string)
                 Json.value
+            , testCoderRoundTrip "resultCoder"
+                (Fuzz.result Fuzz.string Fuzz.int)
+                (resultCoder Json.string Json.int)
+            , testCoderRoundTrip "bimap"
+                (Fuzz.map Constant Fuzz.int)
+                (Json.bimap (\(Constant x) -> x) Constant Json.int)
             ]
         ]
