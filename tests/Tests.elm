@@ -1,0 +1,179 @@
+module Tests exposing (..)
+
+import Test exposing (Test)
+import Expect
+import Fuzz exposing (Fuzzer)
+import Json.Bidirectional as Json
+import Json.Decode as Decode
+import Json.Encode as Encode
+import Dict exposing (Dict)
+
+
+testFuzzedCoderRoundTrip : String -> Fuzzer a -> Fuzzer (Json.Coder a) -> Test
+testFuzzedCoderRoundTrip description valueFuzzer coderFuzzer =
+    Test.fuzz (Fuzz.map2 (,) valueFuzzer coderFuzzer) description <|
+        \( value, coder ) ->
+            value
+                |> Json.encodeValue coder
+                |> Json.decodeValue coder
+                |> Expect.equal (Ok value)
+
+
+testCoderRoundTrip : String -> Fuzzer a -> Json.Coder a -> Test
+testCoderRoundTrip description fuzzer coder =
+    testFuzzedCoderRoundTrip description fuzzer (Fuzz.constant coder)
+
+
+type alias Thing =
+    { a : String
+    , b : Bool
+    , c : Int
+    }
+
+
+thingCoder : Json.Coder Thing
+thingCoder =
+    Json.object Thing
+        |> Json.withField "a" .a Json.string
+        |> Json.withField "b" .b Json.bool
+        |> Json.withField "c" .c Json.int
+
+
+type BinaryTree a
+    = Leaf a
+    | Branch (BinaryTree a) (BinaryTree a)
+
+
+binaryTreeFuzzer : Fuzz.Fuzzer a -> Fuzz.Fuzzer (BinaryTree a)
+binaryTreeFuzzer valueFuzzer =
+    let
+        go maxDepth =
+            if maxDepth <= 0 then
+                Fuzz.map Leaf valueFuzzer
+            else
+                let
+                    recurse =
+                        go (maxDepth - 1)
+                in
+                    Fuzz.frequency
+                        [ ( 1, Fuzz.map Leaf valueFuzzer )
+                        , ( 2, Fuzz.map2 Branch recurse recurse )
+                        ]
+                        |> Result.withDefault (Fuzz.map Leaf valueFuzzer)
+    in
+        go 2
+
+
+leafCoder : Json.Coder a -> Json.Coder a
+leafCoder valueCoder =
+    Json.at [ "leaf" ] valueCoder
+
+
+branchCoder : Json.Coder a -> Json.Coder ( BinaryTree a, BinaryTree a )
+branchCoder valueCoder =
+    let
+        node =
+            Json.lazy (\_ -> binaryTreeCoder valueCoder)
+    in
+        Json.at [ "branch" ] (Json.tuple ( node, node ))
+
+
+binaryTreeencodeValue : Json.Coder a -> BinaryTree a -> Json.Value
+binaryTreeencodeValue valueCoder node =
+    case node of
+        Leaf value ->
+            Json.encodeValue (leafCoder valueCoder) value
+
+        Branch left right ->
+            Json.encodeValue (branchCoder valueCoder) ( left, right )
+
+
+binaryTreeDecoder : Json.Coder a -> Decode.Decoder (BinaryTree a)
+binaryTreeDecoder valueCoder =
+    Decode.oneOf
+        [ Decode.map Leaf (Json.decoder (leafCoder valueCoder))
+        , Decode.map (uncurry Branch) (Json.decoder (branchCoder valueCoder))
+        ]
+
+
+binaryTreeCoder : Json.Coder a -> Json.Coder (BinaryTree a)
+binaryTreeCoder valueCoder =
+    Json.custom
+        (binaryTreeencodeValue valueCoder)
+        (binaryTreeDecoder valueCoder)
+
+
+dictFuzzer : Fuzzer a -> Fuzzer (Dict String a)
+dictFuzzer valueFuzzer =
+    Fuzz.map2 (,) Fuzz.string valueFuzzer
+        |> Fuzz.list
+        |> Fuzz.map Dict.fromList
+
+
+all : Test
+all =
+    Test.describe "Json.Bidirectional"
+        [ Test.describe "Fuzz tests"
+            [ testCoderRoundTrip "string"
+                Fuzz.string
+                Json.string
+            , testCoderRoundTrip "bool"
+                Fuzz.bool
+                Json.bool
+            , testCoderRoundTrip "int"
+                Fuzz.int
+                Json.int
+            , testCoderRoundTrip "float"
+                Fuzz.float
+                Json.float
+            , testCoderRoundTrip "nullable"
+                (Fuzz.maybe Fuzz.int)
+                (Json.nullable Json.int)
+            , testCoderRoundTrip "list"
+                (Fuzz.list Fuzz.int)
+                (Json.list Json.int)
+            , testCoderRoundTrip "object ... |> withField ... |> withField ..."
+                (Fuzz.map3 Thing Fuzz.string Fuzz.bool Fuzz.int)
+                thingCoder
+            , testFuzzedCoderRoundTrip "at"
+                Fuzz.int
+                (Fuzz.list Fuzz.string
+                    |> Fuzz.map (\keyPath -> Json.at keyPath Json.int)
+                )
+            , testCoderRoundTrip "dict"
+                (dictFuzzer Fuzz.int)
+                (Json.dict Json.int)
+            , testCoderRoundTrip "tuple"
+                (Fuzz.tuple ( Fuzz.string, Fuzz.bool ))
+                (Json.tuple ( Json.string, Json.bool ))
+            , testCoderRoundTrip "tuple3"
+                (Fuzz.tuple3 ( Fuzz.string, Fuzz.bool, Fuzz.int ))
+                (Json.tuple3 ( Json.string, Json.bool, Json.int ))
+            , testCoderRoundTrip "tuple4"
+                (Fuzz.tuple4 ( Fuzz.string, Fuzz.bool, Fuzz.int, Fuzz.float ))
+                (Json.tuple4 ( Json.string, Json.bool, Json.int, Json.float ))
+            , testCoderRoundTrip "tuple5"
+                (Fuzz.tuple5
+                    ( Fuzz.string
+                    , Fuzz.bool
+                    , Fuzz.int
+                    , Fuzz.float
+                    , (dictFuzzer Fuzz.int)
+                    )
+                )
+                (Json.tuple5
+                    ( Json.string
+                    , Json.bool
+                    , Json.int
+                    , Json.float
+                    , (Json.dict Json.int)
+                    )
+                )
+            , testCoderRoundTrip "BinaryTree coder using custom and lazy"
+                (binaryTreeFuzzer Fuzz.int)
+                (binaryTreeCoder Json.int)
+            , testCoderRoundTrip "value"
+                (Fuzz.map Encode.string Fuzz.string)
+                Json.value
+            ]
+        ]
