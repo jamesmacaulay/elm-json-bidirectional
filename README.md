@@ -19,7 +19,7 @@ userDecoder : Decoder User
 userDecoder =
     Decode.map2 User
         (Decode.field "name" Decode.string)
-        (Decode.field "age" Decode.int)
+        (Decode.field "isAdmin" Decode.bool)
 
 encodeUser : User -> Encode.Value
 encodeUser user =
