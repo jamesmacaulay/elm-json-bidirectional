@@ -88,7 +88,7 @@ emailContactCoder =
         |> Json.withField "name" .name Json.string
 ```
 
-The above Coder will encode `{ name = "Alice", email = "alice@example.com" }` correctly as `{"name": "Alice", "email", "alice@example.com"}`. However, because the two string fields are specified in the wrong order, the EmailContact constructor decodes the `"email"` field as its `name` and vice-versa.
+The above Coder will encode `{ name = "Alice", email = "alice@example.com" }` correctly as `{"name": "Alice", "email": "alice@example.com"}`. However, because the two string fields are specified in the wrong order, the EmailContact constructor decodes the `"email"` field as its `name` and vice-versa.
 
 ## bimap
 
