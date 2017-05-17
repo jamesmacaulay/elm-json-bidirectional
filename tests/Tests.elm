@@ -59,7 +59,6 @@ binaryTreeFuzzer valueFuzzer =
                         [ ( 1, Fuzz.map Leaf valueFuzzer )
                         , ( 2, Fuzz.map2 Branch recurse recurse )
                         ]
-                        |> Result.withDefault (Fuzz.map Leaf valueFuzzer)
     in
         go 2
 
