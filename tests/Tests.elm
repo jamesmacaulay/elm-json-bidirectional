@@ -171,6 +171,33 @@ all =
             , testCoderRoundTrip "dict"
                 (dictFuzzer Fuzz.int)
                 (Json.dict Json.int)
+            , Test.fuzz (Fuzz.list (Fuzz.tuple ( Fuzz.string, Fuzz.int ))) "keyValuePairs" <|
+                \pairs ->
+                    let
+                        sortedDedupedPairs =
+                            pairs
+                                |> Dict.fromList
+                                |> Dict.toList
+                                |> List.sort
+
+                        coder =
+                            Json.keyValuePairs Json.int
+                    in
+                        sortedDedupedPairs
+                            |> Json.encodeValue coder
+                            |> Json.decodeValue coder
+                            |> Result.map List.sort
+                            |> Expect.equal (Ok sortedDedupedPairs)
+            , Test.fuzz3 Fuzz.string Fuzz.int Fuzz.int "keyValuePairs repeated key takes last value" <|
+                \k v1 v2 ->
+                    let
+                        coder =
+                            Json.keyValuePairs Json.int
+                    in
+                        [ ( k, v1 ), ( k, v2 ) ]
+                            |> Json.encodeValue coder
+                            |> Json.decodeValue coder
+                            |> Expect.equal (Ok [ ( k, v2 ) ])
             , testCoderRoundTrip "tuple"
                 (Fuzz.tuple ( Fuzz.string, Fuzz.bool ))
                 (Json.tuple ( Json.string, Json.bool ))

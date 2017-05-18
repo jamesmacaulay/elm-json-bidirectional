@@ -13,6 +13,7 @@ module Json.Bidirectional
         , withField
         , at
         , dict
+        , keyValuePairs
         , tuple
         , tuple3
         , tuple4
@@ -40,7 +41,7 @@ module Json.Bidirectional
 
 # Data Structures
 
-@docs nullable, list, object, withField, at, dict, tuple, tuple3, tuple4, tuple5, value
+@docs nullable, list, object, withField, at, dict, keyValuePairs, tuple, tuple3, tuple4, tuple5, value
 
 # Fancy Stuff
 
@@ -219,6 +220,32 @@ dict (CoderPair encoder decoder) =
             )
         )
         (Decode.dict decoder)
+
+
+{-| Construct a Coder for a List of 2-tuples whose keys are Strings and whose values have the type of the given Coder argument. The List is encoded as a JSON object with an arbitrary list of fields, just like `dict`.
+
+Decoding is the same as with `Json.Decode.keyValuePairs`, while the encoding process uses `Json.Encode.Object`. This means that repeated use of the same key in the source list will result in a JSON object where the _last_ value from the repeated key ends up being used as that property's value. For example:
+
+    twoFoos : Value
+    twoFoos =
+        [ ( "foo", 1 ), ( "foo", 2 ) ]
+            |> encodeValue (keyValuePairs int)
+
+With the above code, `twoFoos` has the following structure:
+
+    {"foo": 2}
+
+This behaviour means that if you aren't careful to keep your keys free of duplicates, then an encoding/decoding round-trip of the same Elm value could leave you with a value that isn't equal to the one you started with.
+-}
+keyValuePairs : Coder a -> Coder (List ( String, a ))
+keyValuePairs (CoderPair encoder decoder) =
+    CoderPair
+        (Encoder.opaque
+            (List.map (Tuple.mapSecond (Encoder.encodeValue encoder))
+                >> Encode.object
+            )
+        )
+        (Decode.keyValuePairs decoder)
 
 
 {-| Take a 2-tuple of Coders and produce a Coder of 2-tuples, encoding them as 2-element JSON arrays:
