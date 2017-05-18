@@ -1,5 +1,5 @@
 {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "summary": "Two-way JSON encoder-decoders.",
     "repository": "https://github.com/jamesmacaulay/elm-json-bidirectional.git",
     "license": "BSD3",
